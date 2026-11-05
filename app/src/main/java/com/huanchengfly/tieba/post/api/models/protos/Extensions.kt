@@ -396,18 +396,32 @@ val User.bawuType: String?
         if (bawu_type == "manager") "吧主" else "小吧主"
     } else null
 
+/**
+ * 楼中楼按时间正序排序。
+ *
+ * 帖子详情接口返回的 sub_post_list 顺序不可靠（不是按时间排的），
+ * 而「查看全部回复」页面走 pbFloor 分页接口，服务端返回的就是时间正序。
+ * 这里统一一下，避免同一条帖子在两处的展示顺序不一致。
+ */
+private fun List<SubPostList>.sortedByTime(): List<SubPostList> =
+    sortedWith(compareBy({ it.time }, { it.id }))
+
 val Post.subPostContents: ImmutableList<AnnotatedString>
-    get() = sub_post_list?.sub_post_list?.map { it.getContentText(origin_thread_info?.author?.id) }
+    get() = sub_post_list?.sub_post_list
+        ?.sortedByTime()
+        ?.map { it.getContentText(origin_thread_info?.author?.id) }
         ?.toImmutableList()
         ?: persistentListOf()
 
 val Post.subPosts: ImmutableList<SubPostItemData>
-    get() = sub_post_list?.sub_post_list?.map {
-        SubPostItemData(
-            it.wrapImmutable(),
-            it.getContentText(origin_thread_info?.author?.id)
-        )
-    }?.toImmutableList() ?: persistentListOf()
+    get() = sub_post_list?.sub_post_list
+        ?.sortedByTime()
+        ?.map {
+            SubPostItemData(
+                it.wrapImmutable(),
+                it.getContentText(origin_thread_info?.author?.id)
+            )
+        }?.toImmutableList() ?: persistentListOf()
 
 @OptIn(ExperimentalTextApi::class)
 fun SubPostList.getContentText(threadAuthorId: Long? = null): AnnotatedString {
